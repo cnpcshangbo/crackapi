@@ -1,2 +1,4 @@
 trash/
 *.las
+__pycache__/
+output_image.png
