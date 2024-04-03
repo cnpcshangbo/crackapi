@@ -2,6 +2,7 @@
 # Method 1: convert pointCloud to binary image and process the binary image
 # Method 2: get skeletonization and measure in 3D
 # This file is using the first method
+# %%
 import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ import redFilter
 import configparser
 
 
-def pointcloud_to_binary_image(pcd, plane='XY', resolution=0.01):
+def pointcloud_to_binary_image(pcd, plane="XY", resolution=0.01):
     """
     Converts an Open3D PointCloud to a 2D binary image.
 
@@ -29,28 +30,41 @@ def pointcloud_to_binary_image(pcd, plane='XY', resolution=0.01):
     # Extract the points from the point cloud.
     points = np.asarray(pcd.points)
 
-    if plane == 'XY':
+    if plane == "XY":
         x, y = points[:, 0], points[:, 1]
-    elif plane == 'XZ':
+    elif plane == "XZ":
         x, y = points[:, 0], points[:, 2]
-    elif plane == 'YZ':
+    elif plane == "YZ":
         x, y = points[:, 1], points[:, 2]
     else:
         raise ValueError("Invalid plane. Choose 'XY', 'XZ', or 'YZ'.")
+
+    # Get the minimum and maximum bounds
+    x_min = np.min(x)
+    y_min = np.min(y)
+
+    # Shift the coordinates to positive
+    x -= x_min
+    y -= y_min
 
     # Discretize the points.
     x_discrete = (x // resolution).astype(int)
     y_discrete = (y // resolution).astype(int)
 
     # Create the binary image.
+    if y_discrete.max() < 0 or x_discrete.max() < 0:
+        raise ValueError("Negative dimensions are not allowed.")
+
     img = np.zeros((y_discrete.max() + 1, x_discrete.max() + 1), dtype=np.uint8)
     img[y_discrete, x_discrete] = 1
 
     return img
 
+
 # Skeletonize the binary image
 def skeletonize_image(binary_img):
     return skeletonize(binary_img)
+
 
 # Compute the length of the skeleton (crack length)
 def compute_skeleton_length(skeleton_img):
@@ -65,7 +79,7 @@ def compute_skeleton_length(skeleton_img):
 # pcd = o3d.geometry.PointCloud()
 # pcd.points = o3d.utility.Vector3dVector(np.random.rand(1000, 3))
 
-pcd_raw = o3d.io.read_point_cloud("../crack.las", format="las")
+pcd_raw = o3d.io.read_point_cloud("../crack.ply", format="ply")
 
 # Get the minimum and maximum bounds
 min_bound = pcd_raw.get_min_bound()
@@ -95,17 +109,25 @@ print(f"Center point: {center_point}")
 
 # Read configuration file
 config = configparser.ConfigParser()
-config.read('clicks_config.ini')
+config.read("clicks_config.ini")
 
 # Extract the click coordinates
-click1_x = float(config['Clicks']['click1_x'])
-click1_y = float(config['Clicks']['click1_y'])
-click2_x = float(config['Clicks']['click2_x'])
-click2_y = float(config['Clicks']['click2_y'])
+click1_x = float(config["Clicks"]["click1_x"])
+click1_y = float(config["Clicks"]["click1_y"])
+click2_x = float(config["Clicks"]["click2_x"])
+click2_y = float(config["Clicks"]["click2_y"])
 
 # Calculate the cropping bounds
-crop_min_bound = [min(click1_x, click2_x), min(click1_y, click2_y), min_bound[2]]  # Z-coordinate is set to 0 as a placeholder
-crop_max_bound = [max(click1_x, click2_x), max(click1_y, click2_y), max_bound[2]]  # Z-coordinate is set to 0 as a placeholder
+crop_min_bound = [
+    min(click1_x, click2_x),
+    min(click1_y, click2_y),
+    min_bound[2],
+]  # Z-coordinate is set to 0 as a placeholder
+crop_max_bound = [
+    max(click1_x, click2_x),
+    max(click1_y, click2_y),
+    max_bound[2],
+]  # Z-coordinate is set to 0 as a placeholder
 
 
 # Create the bounding box
@@ -132,6 +154,9 @@ OverlaySceneColors_raw = np.asarray(OverlaySceneCropped_pcd.colors)
 # import ../main
 pcd = redFilter.filter_red_points(OverlaySceneCropped_pcd)
 
+# Save the filtered red point cloud
+o3d.io.write_point_cloud("redCloud.ply", pcd, write_ascii=True)
+
 # 提取点云数据
 points = np.asarray(pcd.points)
 colors = np.asarray(pcd.colors)
@@ -141,7 +166,13 @@ colors = np.asarray(pcd.colors)
 # ax = fig.add_subplot(111, projection='3d')
 
 # Convert the point cloud to a binary image.
-img = pointcloud_to_binary_image(pcd, plane='XY', resolution=0.001)
+img = pointcloud_to_binary_image(pcd, plane="XY", resolution=0.1)
+
+# Print the range of the RGB channels
+print("Range of R channel:", np.min(colors[:, 0]), np.max(colors[:, 0]))
+print("Range of G channel:", np.min(colors[:, 1]), np.max(colors[:, 1]))
+print("Range of B channel:", np.min(colors[:, 2]), np.max(colors[:, 2]))
+
 
 # Display the image using Open3D.
 # o3d.visualization.draw_geometries([o3d.geometry.Image((img * 255).astype(np.uint8))])
@@ -153,7 +184,7 @@ img = pointcloud_to_binary_image(pcd, plane='XY', resolution=0.001)
 
 # Save the binary image using PIL.
 img_pil = Image.fromarray((img * 255).astype(np.uint8))
-img_pil.save('binary_image.png')
+img_pil.save("binary_image.png")
 
 # Perform skeletonization
 skeleton = skeletonize_image(img)
@@ -164,12 +195,12 @@ print(f"Total Crack Length: {crack_length}")
 
 # Display the images
 fig, ax = plt.subplots(2, 3, figsize=(10, 5))
-
-ax[0,0].scatter(points_raw[:, 0], points_raw[:, 1], points_raw[:, 2], c=colors_raw)
+# %%
+ax[0, 0].scatter(points_raw[:, 0], points_raw[:, 1], points_raw[:, 2], c=colors_raw)
 # ax[0,0].axis('off')
-ax[0,0].set_title('Original Point Cloud')
+ax[0, 0].set_title("Original Point Cloud")
 # 2. Add a green rectangle to cover the top-left quarter
-axes = ax[0,0]
+axes = ax[0, 0]
 x_lim = axes.get_xlim()
 y_lim = axes.get_ylim()
 
@@ -181,34 +212,41 @@ width = crop_max_bound[0] - crop_min_bound[0]
 height = crop_max_bound[1] - crop_min_bound[1]
 
 # Create the rectangle starting from the top-left
-rect = plt.Rectangle((crop_min_bound[0], crop_min_bound[1]), width, height, facecolor='green', alpha = 0.5)
+rect = plt.Rectangle(
+    (crop_min_bound[0], crop_min_bound[1]), width, height, facecolor="green", alpha=0.5
+)
 axes.add_patch(rect)
 
 # plt.show()
 
-# ax[0,1].imshow(OverlaySceneCropped_pcd, cmap='gray')
-ax[0,1].scatter(OverlayScenePoints_raw[:, 0], OverlayScenePoints_raw[:, 1], OverlayScenePoints_raw[:, 2], c=OverlaySceneColors_raw)
+# %% ax[0,1].imshow(OverlaySceneCropped_pcd, cmap='gray')
+ax[0, 1].scatter(
+    OverlayScenePoints_raw[:, 0],
+    OverlayScenePoints_raw[:, 1],
+    OverlayScenePoints_raw[:, 2],
+    c=OverlaySceneColors_raw,
+)
 # ax[0,1].axis('off')
-ax[0,1].set_title('Selected Point Cloud')
+ax[0, 1].set_title("Selected Point Cloud")
 
-# 绘制点云
+# %%绘制点云
 # ax[0,2] = fig.add_subplot(111, projection='3d')
-ax[0,2].scatter(points[:, 0], points[:, 1], points[:, 2], c=colors)
+ax[0, 2].scatter(points[:, 0], points[:, 1], points[:, 2], c=colors)
 # ax[0,2].axis('off')
-ax[0,2].set_title('Crack on Selected Point Cloud')
+ax[0, 2].set_title("Crack on Selected Point Cloud")
 
-
-ax[1,0].imshow(img, cmap='gray')
+# %%
+ax[1, 0].imshow(img, cmap="gray")
 # ax[1,0].axis('off')
-ax[1,0].set_title('Binary Image')
-
-ax[1,1].imshow(skeleton, cmap='gray')
+ax[1, 0].set_title("Binary Image")
+# %%
+ax[1, 1].imshow(skeleton, cmap="gray")
 # ax[1,1].axis('off')
-ax[1,1].set_title('Skeletonized Image')
-
-ax[1,2].axis('off')
-ax[1,2].set_title(f"Total Crack Length: {crack_length}")
+ax[1, 1].set_title("Skeletonized Image")
+# %%
+ax[1, 2].axis("off")
+ax[1, 2].set_title(f"Total Crack Length: {crack_length}")
 
 plt.tight_layout()
 plt.show()
-#%%
+# %%

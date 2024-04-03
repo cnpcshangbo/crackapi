@@ -1,9 +1,15 @@
 import open3d as o3d
 import numpy as np
 
+
 def filter_red_points(pcd):
     # 将点云转换为numpy数组
     colors = np.asarray(pcd.colors)
+
+    # Print the range of the RGB channels
+    print("Range of R channel:", np.min(colors[:, 0]), np.max(colors[:, 0]))
+    print("Range of G channel:", np.min(colors[:, 1]), np.max(colors[:, 1]))
+    print("Range of B channel:", np.min(colors[:, 2]), np.max(colors[:, 2]))
 
     # 定义红色的条件：R > 0.8, G < 0.2, B < 0.2 （颜色值在0到1之间）
     red_mask = (colors[:, 0] > 0.8) & (colors[:, 1] < 0.2) & (colors[:, 2] < 0.2)
@@ -18,6 +24,7 @@ def filter_red_points(pcd):
     red_pcd.colors = o3d.utility.Vector3dVector(red_colors)
 
     return red_pcd
+
 
 # # 读取点云数据
 # pcd = o3d.io.read_point_cloud("scene_dense.ply")

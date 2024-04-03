@@ -4,3 +4,4 @@ __pycache__/
 output_image.png
 crack.ply
 file-cropped.ply
+PointCloud2BinaryImage/OverlaySceneCropped.ply
