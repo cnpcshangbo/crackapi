@@ -173,15 +173,6 @@ print("Range of R channel:", np.min(colors[:, 0]), np.max(colors[:, 0]))
 print("Range of G channel:", np.min(colors[:, 1]), np.max(colors[:, 1]))
 print("Range of B channel:", np.min(colors[:, 2]), np.max(colors[:, 2]))
 
-
-# Display the image using Open3D.
-# o3d.visualization.draw_geometries([o3d.geometry.Image((img * 255).astype(np.uint8))])
-
-# Display the image using matplotlib.
-# plt.imshow(img, cmap='gray')
-# plt.axis('off')
-# plt.show()
-
 # Save the binary image using PIL.
 img_pil = Image.fromarray((img * 255).astype(np.uint8))
 img_pil.save("binary_image.png")
@@ -193,60 +184,34 @@ skeleton = skeletonize_image(img)
 crack_length = compute_skeleton_length(skeleton)
 print(f"Total Crack Length: {crack_length}")
 
-# Display the images
-fig, ax = plt.subplots(2, 3, figsize=(10, 5))
-# %%
-ax[0, 0].scatter(points_raw[:, 0], points_raw[:, 1], points_raw[:, 2], c=colors_raw)
-# ax[0,0].axis('off')
-ax[0, 0].set_title("Original Point Cloud")
-# 2. Add a green rectangle to cover the top-left quarter
-axes = ax[0, 0]
-x_lim = axes.get_xlim()
-y_lim = axes.get_ylim()
+# Save the crack on the selected point cloud
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(111)
+ax1.scatter(points[:, 0], points[:, 1], c=colors, s=1)
+ax1.set_title("Crack on Selected Point Cloud")
+fig1.savefig("crack_on_selected_point_cloud.png")
+plt.close(fig1)
 
-# x_lim[0] = crop_min_bound[0]
+# Save the binary image
+fig2 = plt.figure()
+ax2 = fig2.add_subplot(111)
+ax2.imshow(img, cmap="gray")
+ax2.set_title("Binary Image")
+fig2.savefig("binary_image.png")
+plt.close(fig2)
 
-# width = (x_lim[1] - x_lim[0]) / 2
-# height = (y_lim[1] - y_lim[0]) / 2
-width = crop_max_bound[0] - crop_min_bound[0]
-height = crop_max_bound[1] - crop_min_bound[1]
+# Save the skeletonized image
+fig3 = plt.figure()
+ax3 = fig3.add_subplot(111)
+ax3.imshow(skeleton, cmap="gray")
+ax3.set_title("Skeletonized Image")
+fig3.savefig("skeletonized_image.png")
+plt.close(fig3)
 
-# Create the rectangle starting from the top-left
-rect = plt.Rectangle(
-    (crop_min_bound[0], crop_min_bound[1]), width, height, facecolor="green", alpha=0.5
-)
-axes.add_patch(rect)
+# Save the total crack length
+import json
 
-# plt.show()
-
-# %% ax[0,1].imshow(OverlaySceneCropped_pcd, cmap='gray')
-ax[0, 1].scatter(
-    OverlayScenePoints_raw[:, 0],
-    OverlayScenePoints_raw[:, 1],
-    OverlayScenePoints_raw[:, 2],
-    c=OverlaySceneColors_raw,
-)
-# ax[0,1].axis('off')
-ax[0, 1].set_title("Selected Point Cloud")
-
-# %%绘制点云
-# ax[0,2] = fig.add_subplot(111, projection='3d')
-ax[0, 2].scatter(points[:, 0], points[:, 1], points[:, 2], c=colors)
-# ax[0,2].axis('off')
-ax[0, 2].set_title("Crack on Selected Point Cloud")
-
-# %%
-ax[1, 0].imshow(img, cmap="gray")
-# ax[1,0].axis('off')
-ax[1, 0].set_title("Binary Image")
-# %%
-ax[1, 1].imshow(skeleton, cmap="gray")
-# ax[1,1].axis('off')
-ax[1, 1].set_title("Skeletonized Image")
-# %%
-ax[1, 2].axis("off")
-ax[1, 2].set_title(f"Total Crack Length: {crack_length}")
-
-plt.tight_layout()
-plt.show()
-# %%
+# Save the total crack length to a JSON file
+data = {"total_crack_length": crack_length}
+with open("total_crack_length.json", "w") as file:
+    json.dump(data, file)
