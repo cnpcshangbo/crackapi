@@ -1,3 +1,4 @@
+import os
 import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,9 +6,13 @@ from PIL import Image
 from skimage.morphology import skeletonize
 from skimage.measure import label, regionprops
 from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
 from io import BytesIO
 
 app = Flask(__name__)
+app.config["CORS_HEADERS"] = "Content-Type"
+CORS(app, resources={r"/analyze_crack": {"origins": "*"}})
+# CORS(app)
 
 
 class CrackAnalyzer:
@@ -44,7 +49,7 @@ class CrackAnalyzer:
         self.red_pcd.points = o3d.utility.Vector3dVector(red_points)
         o3d.io.write_point_cloud("redCloud.ply", self.red_pcd, write_ascii=True)
 
-    def pointcloud_to_binary_image(self, plane="XY", resolution=0.1):
+    def pointcloud_to_binary_image(self, plane="XY", resolution=0.001):
         points = np.asarray(self.red_pcd.points)
         if plane == "XY":
             x, y = points[:, 0], points[:, 1]
@@ -110,22 +115,58 @@ class CrackAnalyzer:
 
 @app.route("/analyze_crack", methods=["GET"])
 def analyze_crack():
-    click1_x = float(request.args.get("click1_x"))
-    click1_y = float(request.args.get("click1_y"))
-    click2_x = float(request.args.get("click2_x"))
-    click2_y = float(request.args.get("click2_y"))
+    try:
+        click1_x = float(request.args.get("click1_x"))
+        click1_y = float(request.args.get("click1_y"))
+        click2_x = float(request.args.get("click2_x"))
+        click2_y = float(request.args.get("click2_y"))
 
-    analyzer = CrackAnalyzer("../crack.ply")
-    analyzer.crop_point_cloud(click1_x, click1_y, click2_x, click2_y)
-    analyzer.filter_red_points()
-    analyzer.pointcloud_to_binary_image()
-    analyzer.skeletonize_image()
-    analyzer.compute_skeleton_length()
-    analyzer.save_images()
+        html_file = request.args.get("html_file")
+        print(html_file)
+        html_file_name = html_file.split("/")[-1]
+        print(html_file_name)
+        if html_file_name == "copc_bayonne_crackoverlay_meta.html":
+            print("find the bayonne las file")
+            analyzer = CrackAnalyzer("../crack.ply")
+        elif html_file_name == "copc_troy_classification.html":
+            print("find the troy las file")
+            analyzer = CrackAnalyzer("../troy.ply")
+        else:
+            print("find no las file")
+            raise Exception("No LAS file found")
 
-    response_data = {"total_crack_length": analyzer.total_length}
+        analyzer.crop_point_cloud(click1_x, click1_y, click2_x, click2_y)
+        analyzer.filter_red_points()
+        analyzer.pointcloud_to_binary_image()
+        analyzer.skeletonize_image()
+        analyzer.compute_skeleton_length()
+        analyzer.save_images()
 
-    return jsonify(response_data)
+        response_data = {"total_crack_length": analyzer.total_length}
+        return jsonify(response_data)
+    except Exception as e:
+        print(f"Error in /analyze_crack: {str(e)}")
+        return jsonify({"error": "An error occurred during analysis."}), 500
+
+
+@app.after_request
+def cleanup(response):
+    # Perform cleanup tasks here
+    print("Cleaning up resources...")
+
+    # Delete the generated files
+    # file_names = [
+    #     "OverlaySceneCropped.ply",
+    #     "redCloud.ply",
+    #     "binary_image.png",
+    #     "crack_on_selected_point_cloud.png",
+    #     "skeletonized_image.png",
+    # ]
+    # for file_name in file_names:
+    #     if os.path.exists(file_name):
+    #         os.remove(file_name)
+
+    return response
 
 
 @app.route("/get_image/<image_name>")
